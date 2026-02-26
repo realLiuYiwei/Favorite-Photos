@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Viewer</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f7;
+            color: #1d1d1f;
+        }
+        /* 网格布局实现自适应平铺 */
+        #gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        .image-card {
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .image-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        }
+        .image-card img {
+            width: 100%;
+            height: 250px;
+            object-fit: cover; /* 保证图片不变形，裁剪填充区域 */
+            display: block;
+        }
+        .filename {
+            padding: 12px;
+            font-size: 14px;
+            text-align: center;
+            word-break: break-all;
+            color: #555;
+        }
+        #status-msg {
+            text-align: center;
+            font-size: 18px;
+            margin-top: 50px;
+        }
+        .error { color: #d93025; }
+    </style>
+</head>
+<body>
+
+<div id="status-msg">正在请求 GitHub API 加载图片目录...</div>
+<div id="gallery"></div>
+
+<script>
+    // ==========================================
+    // 核心配置：请在这里替换为你自己的 GitHub 信息
+    // ==========================================
+    const owner = 'YOUR_GITHUB_USERNAME'; 
+    const repo = 'YOUR_REPO_NAME';
+    const path = 'images'; // 对应的文件夹名称
+    
+    // 如果你的仓库是私有的，需要在这里填入具有 repo 权限的 Personal Access Token
+    // 如果是公开仓库，保留为空字符串即可
+    const githubToken = ''; 
+
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    
+    async function fetchAndRenderImages() {
+        const gallery = document.getElementById('gallery');
+        const statusMsg = document.getElementById('status-msg');
+
+        const headers = {};
+        if (githubToken) {
+            headers['Authorization'] = `token ${githubToken}`;
+        }
+
+        try {
+            const response = await fetch(apiUrl, { headers });
+            
+            if (!response.ok) {
+                throw new Error(`API 请求失败: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            // 过滤提取常见图片格式文件
+            const imageFiles = data.filter(item => 
+                item.type === 'file' && 
+                item.name.match(/\.(jpe?g|png|gif|webp|svg)$/i)
+            );
+
+            if (imageFiles.length === 0) {
+                statusMsg.textContent = '该文件夹下没有找到支持的图片文件。';
+                return;
+            }
+
+            statusMsg.style.display = 'none';
+
+            // 遍历并渲染到 DOM 中
+            imageFiles.forEach(file => {
+                const card = document.createElement('div');
+                card.className = 'image-card';
+
+                const img = document.createElement('img');
+                img.src = file.download_url; // API 返回的直接下载地址
+                img.alt = file.name;
+                img.loading = 'lazy'; // 开启懒加载，优化多图情况下的带宽和内存占用
+
+                const title = document.createElement('div');
+                title.className = 'filename';
+                title.textContent = file.name;
+
+                card.appendChild(img);
+                card.appendChild(title);
+                gallery.appendChild(card);
+            });
+
+        } catch (error) {
+            statusMsg.className = 'error';
+            statusMsg.textContent = `加载错误：${error.message}。请检查仓库是否为公开，或者用户名/仓库名是否填写正确。`;
+            console.error(error);
+        }
+    }
+
+    fetchAndRenderImages();
+</script>
+</body>
+</html>
